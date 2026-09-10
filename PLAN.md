@@ -63,20 +63,49 @@
 
 ## 2. 成功度量（Outcome）
 
-> v1 缺的就是这一节：验收标准只能证明"功能按描述工作"，证明不了"问题被解决了"。
+> 本节区分**观测指标**（记录实际值，用于判断价值，不设门槛）和**验收门槛**（必须达标，否则不算完成）。
+> v1 完全没有这一节；v2 初版有门槛但数字是拍的，且缺基线 —— 以下是修正版。
 
-**主指标** —— 用 pi-grounded 读 Pi 源码连续 10 轮问答后：
+### 2.1 基线对照（A/B，先做）
 
-- **M-1 引用密度**：≥ 80% 的代码事实性回答带有至少一处 `file:line`
-- **M-2 引用有效率**：所有引用中，指向真实存在的文件且行号未越界的比例 ≥ 90%
-- **M-3 幻觉捕获**：至少捕获到 1 次"引用了不存在的文件或越界的行号" —— **若一次都没捕获到，说明校验层没有产生独立价值**（见 §7 Kill criteria）
+**不测基线就无法归因。** 如果 Pi 本来就有 70% 的回答带出处，"开插件后 80%"什么也证明不了。
 
-**反指标**（不能变差）：
+做法：准备 **12 个**关于 Pi 源码的问题（覆盖架构、具体实现、边界行为三类），
 
-- **M-4** 不因插件产生任何会话中断、崩溃或 Pi 自身功能失效
-- **M-5** 误报率：把有效引用判为无效的次数 = 0
+1. **A 组（基线）**：`/grounded off`，逐个提问，手工记录
+2. **B 组（实验）**：`/grounded on`，**同样 12 题**重新开一个会话提问
 
-度量方式：M0 完成后开一个 `NOTES.md` 手工记录 10 轮实测，不做自动埋点。
+> n=12 是可行性与统计力的折中。**明确其局限：n=12 只够发现明显差异，不足以支撑细微判断。** 任何依赖它的决策都必须考虑这一点（见 §7 K2）。
+
+### 2.2 观测指标（记录实际值，不设门槛）
+
+| | 含义 | 怎么读 |
+|---|---|---|
+| **O-1 引用密度** | 代码事实性回答中带 `file:line` 的比例 | **看 B 相对 A 的提升幅度**，不看绝对值 |
+| **O-2 引用有效率** | 所有引用中路径存在且行号未越界的比例 | 判断模型是否倾向编造行号 |
+| **O-3 幻觉捕获数** | 校验层抓到的无效引用次数 | **这是校验层是否有独立价值的唯一证据** |
+
+> ⚠️ **O-2 存在循环论证**：它是用插件自己的校验结果评价插件。因此必须做独立核对 —— 见 2.4。
+
+### 2.3 验收门槛（必须达标）
+
+| | 门槛 | 为什么是这个值 |
+|---|---|---|
+| **T-1 误报率** | **= 0**：任何真实有效的引用都不得被判为无效 | 不是拍的数。校验层一旦误报就是在制造噪音，一次都不能有 —— 这是它能否存在的前提 |
+| **T-2 无副作用** | 不产生会话中断、崩溃或 Pi 自身功能失效 | 底线 |
+| **T-3 提示不泛滥** | B 组中出现 `no-citation` 提示的轮次 **< 30%** | 超过则说明模型基本不听 prompt，插件退化为噪音源（见 §8 R6） |
+
+> **T-1 和 T-3 是硬门槛，O-1/O-2/O-3 只记录不卡关。** 原因：前者是"插件会不会帮倒忙"，可以客观判定；后者是"插件有多大用"，n=12 撑不起门槛。
+
+### 2.4 独立核对（破循环论证）
+
+从 B 组结果中**手工抽查 10 处引用**，人工打开文件核对，与插件判定逐条比对。
+
+- 任何一条不一致 → **正则或路径解析有 bug**，属于 T-1 失败，必须修完重测
+
+### 2.5 记录方式
+
+`NOTES.md` 手工记录，不做自动埋点。表格：题号 / 组别 / 是否有引用 / 引用数 / 插件判定 / 人工核对结果。
 
 ---
 
@@ -97,7 +126,7 @@
   ✓ grounded · 3 处引用已校验
 ```
 
-**US2 · 抓到编造的行号（核心价值）**
+**US2 · 抓到编造的行号（核心价值）** — ⚠️ *以下为示意，非实测观察；真实案例待 M1 端到端测试后回填*
 ```
 > compaction 是怎么触发的？
 
@@ -154,6 +183,7 @@
 | **D8** | 命令 | `/grounded`（`/source` 别名）+ `pi --grounded` | 三个入口够了 | 更多子命令 |
 | **D9** | 配置 | **无配置文件**，常量写在 `src/config.ts`，改完 `/reload` 生效 | jiti 直接跑 TS，改常量成本极低 | JSON 配置 |
 | **D10** | 状态 | **仅内存**，不跨会话 | `/resume` 后重敲一次不是负担 | `appendEntry` 持久化 |
+| **D11** | `GROUNDED_BLOCK` 用什么语言写 | **指令用英文，输出标记用中文** | Pi 自身 system prompt 是英文，混入中文指令会降低遵循稳定性；而标记是给你看的，中文更直观。改语言只需动 `prompt.ts` 一个常量 | 全中文 / 全英文 |
 
 ---
 
@@ -262,7 +292,9 @@ Pi 内置工具全集：`read` `bash` `powershell` `edit` `write` `grep` `find` 
     └── citations.test.ts
 ```
 
-> **核心原则**：`citations.ts` 是纯函数（文件系统访问通过注入的 `fs` 接口），可直接单测，不需要跑 LLM。副作用全部收敛在 `index.ts`。
+> **核心原则**：`citations.ts` 不直接依赖 `ExtensionAPI`，文件系统访问通过**依赖注入**的 `fs` 接口（测试时传入内存假实现）。因此可直接单测，不需要跑 LLM。副作用全部收敛在 `index.ts`。
+>
+> （v2 初版此处写作"纯函数"，措辞不准确 —— 要访问 fs 就不是纯函数，那叫依赖注入。）
 
 ---
 
@@ -276,9 +308,11 @@ Pi 内置工具全集：`read` `bash` `powershell` `edit` `write` `grep` `find` 
 
 **做法**：写一个 10 行的临时扩展，在 `message_end` 里给 assistant message 末尾追加一行，然后依次测 `/export`、`/tree`、`/resume`、`/share`。
 
-**出口**
-- [ ] 四项全部正常 → 采用 `message_end` 方案
-- [ ] 任一异常 → 改用 `appendEntry` + `registerEntryRenderer` 降级方案，**并把结论写回本文档**
+**出口**（三分支，不是二值）
+- [ ] **四项全部正常** → 采用 `message_end` 方案
+- [ ] **仅 `/share` 异常** → 仍采用 `message_end`，README 注明"`/share` 导出的 gist 中提示块可能缺失"（`/share` 是低频功能，不值得为它放弃首选方案）
+- [ ] **`/export` / `/tree` / `/resume` 任一异常** → 改用 `appendEntry` + `registerEntryRenderer` 降级方案（这三项影响会话完整性，不可妥协）
+- [ ] 无论走哪个分支，**结论都必须写回本文档 §5.5 并 commit**
 
 ### M0 · 骨架 + 只读模式（0.5 天）
 
@@ -296,12 +330,15 @@ Pi 内置工具全集：`read` `bash` `powershell` `edit` `write` `grep` `find` 
 - [ ] 端到端 `invalid`：手工构造一个越界行号的回答 → 提示块正确列出原因
 - [ ] 端到端 `no-citation`：问一个模型倾向凭印象回答的问题 → 出现提示块
 - [ ] 寒暄（"好的"）不触发任何检查
-- [ ] **误报率为 0**（M-5）：所有真实有效的引用都不被判为无效
+- [ ] **T-1 误报率为 0**：所有真实有效的引用都不被判为无效
+- [ ] **§2.4 独立核对通过**：手工抽查 10 处引用，与插件判定逐条一致
 - [ ] 任何校验异常都不中断会话（try/catch 兜底，失败降级为静默通过）
 
 ### M2 · 度量与打包（0.5 天）
 
-- [ ] 按 §2 完成 10 轮实测并记入 `NOTES.md`，M-1/M-2/M-3 达标
+- [ ] 按 §2.1 完成基线 A/B（12 题 × 2 组），记入 `NOTES.md`
+- [ ] **硬门槛 T-1 / T-2 / T-3 全部达标**（否则触发 K3 / K4）
+- [ ] 观测指标 O-1 / O-2 / O-3 已记录实际值（不卡关，用于判断是否触发 K2 观察期）
 - [ ] `pi install <本地路径>` 成功；`pi list` 可见；`/grounded` 可用；`pi remove` 干净卸载
 - [ ] README 含：N1 免责声明、用法、如何改标记语言、与 `pi-behavior-control` 的差异
 
@@ -310,8 +347,11 @@ Pi 内置工具全集：`read` `bash` `powershell` `edit` `write` `grep` `find` 
 > v1 完全没有这一节。
 
 - **K1** S0 两个方案都不可行（提示块无法呈现）→ 停手，重新设计呈现层
-- **K2** M1 完成后实测 **M-3 为 0**（一次幻觉都没抓到）且 M-1 引用密度已 ≥ 80% → 说明 prompt 注入已经够用，校验层没有独立价值 → **降级为纯 prompt 扩展并大幅缩减代码**，不要为了完成计划而保留无用的复杂度
-- **K3** 误报率（M-5）无法降到 0 → 校验层会制造噪音，弊大于利 → 停手
+- **K2** **O-3 幻觉捕获数为 0** → 校验层可能没有独立价值。
+  **但不立即降级** —— n=12 可能只是运气，用一个偶然结果推翻核心设计，样本量和决策严肃性不匹配。
+  正确做法：**进入为期 1 周的日常使用观察期**（正常读 Pi 源码，不刻意构造问题）。1 周后 O-3 仍为 0，且 O-1 在基线基础上已有明显提升 → 才降级为纯 prompt 扩展并砍掉校验层代码。
+- **K3** **T-1 误报率无法降到 0** → 校验层制造噪音，弊大于利 → 停手
+- **K4** **T-3 不达标**（`no-citation` 轮次 ≥ 30%）且 prompt 迭代 3 轮后仍无改善 → 说明模型不吃这套提示，整个方案的前提不成立 → 停手，重新考虑约束手段（见 §8 R6）
 
 ---
 
@@ -323,14 +363,18 @@ Pi 内置工具全集：`read` `bash` `powershell` `edit` `write` `grep` `find` 
 | **R2** | 引用正则误判（`v1.2:30`） | 扩展名白名单 + ≥20 条单测反例 |
 | **R3** | 相对路径解析失败导致误报"文件不存在" | cwd → git 根 两级回退；M1 验收硬性要求误报率 0 |
 | **R4** | `setActiveTools` 与 `/tools`、其它扩展冲突 | 只做增量恢复，不整体覆盖；README 说明 |
-| **R5** | 模型无视标记格式 | 可接受 —— 校验是主，格式是辅 |
+| **R5** | 模型无视 `[推断]`/`[不确定]` 标记格式 | 可接受 —— 校验是主，格式是辅 |
+| **R6** 🔴 | **模型根本不给 `file:line`** —— 则 `no-citation` 提示块每轮都出现，插件从质量工具退化为**噪音生成器**，比不装还烦 | **这是最可能发生的失败模式，也是本项目的头号风险。** ① `GROUNDED_BLOCK` 中明确告知"你给的每一处引用都会被工具校验"（附录 §10 第 3 条），这是比单纯要求更有效的行为杠杆；② 设硬门槛 T-3（`no-citation` 轮次 < 30%）；③ 若 T-3 不达标，先迭代 prompt 措辞（最多 3 轮），仍不达标则触发 K4 |
 
 ### 待 Kayce001 拍板
 
-- **Q1** §4 的 D1–D10 是否同意？尤其 **D1**（摘掉写工具）和 **D2**（用引用校验取代工具追踪）
-- **Q2** §2 的成功度量门槛（80% / 90%）合不合理？
+- **Q1** §4 的 D1–D11 是否同意？尤其 **D1**（摘掉写工具）和 **D2**（用引用校验取代工具追踪）
+- **Q2** **附录 §10 的 `GROUNDED_BLOCK` 文本请逐条过目** —— 它决定 O-1 和 T-3 的成败，是本插件最关键的单一产出物，动工后改动成本会变高
 - **Q3** 是每个里程碑停下来给你看，还是 S0→M2 一次做完？（建议前者，且 **S0 结果必须先给你看**）
 - **Q4** M2 的发布范围：本地 `pi install` 即可，还是要发到 npm/GitHub？
+- **Q5** §2.1 的基线 A/B 要问 12 题×2 轮，比较费时间。接受吗？还是降到 8 题（进一步牺牲统计力）？
+
+> 原 v2 的 "Q2：80%/90% 门槛合不合理" 已删除 —— 那两个数是我拍的，把该我做的判断推给你是偷懒。现已改为 §2.3 中有明确依据的 T-1/T-3。
 
 ---
 
@@ -339,3 +383,74 @@ Pi 内置工具全集：`read` `bash` `powershell` `edit` `write` `grep` `find` 
 - Pi Extensions 文档：`packages/coding-agent/docs/extensions.md`（earendil-works/pi @ 0.85.1）
 - 官方示例：`pirate.ts`（命令 + prompt 注入）、`tools.ts`（setActiveTools）、`entry-renderer.ts`（降级方案参考）、`message-renderer.ts`
 - 对照项目：[`wbelk/pi-behavior-control`](https://github.com/wbelk/pi-behavior-control)
+
+---
+
+## 10. 附录：`GROUNDED_BLOCK` 草稿 · **请重点审核**
+
+> 这是本插件最关键的单一产出物 —— **O-1（引用密度）和 T-3（提示不泛滥）成不成立，几乎完全由这段文字的措辞决定。**
+> v2 初版只有 5 条 bullet 描述"要求模型做什么"，没有实际文本，等于把最关键的变量留成空白。以下是补上的 v1 草稿。
+>
+> 语言遵循 **D11**：指令英文（与 Pi 自身 system prompt 一致），输出标记中文。
+> 追加位置：`event.systemPrompt` **末尾**（指令末尾权重更高）。
+
+```text
+## Source-Grounded Mode
+
+You are in read-only research mode. The user is studying this codebase,
+not changing it.
+
+1. Evidence before claims.
+   Before stating any fact about how THIS codebase works, read the relevant
+   source with `read`, `grep`, or `find`. Do not answer from general knowledge
+   of how similar projects are usually built. "Most agent frameworks do X" is
+   not an answer to "what does this code do".
+
+2. Cite every code fact.
+   Each factual statement about this codebase must carry a source reference
+   in the form `path/to/file.ext:LINE` — repo-root-relative, with a line
+   number. A bare filename without a line number does not count.
+
+3. Cite only what you actually read. Never guess a line number.
+   If you know which file but not the line, read it first.
+   A wrong line number is worse than no citation.
+   Every reference you give is automatically verified against the filesystem,
+   and invalid ones are shown to the user.
+
+4. Mark what is not directly supported:
+   - Directly supported by source → just give `file:line`, no label.
+   - Your own reasoning beyond what the source states → prefix `[推断]`
+   - Cannot be determined from the source → prefix `[不确定]`
+
+5. Prefer `[不确定]` over guessing.
+   "The source does not say" is a good answer. Inventing a plausible
+   mechanism is not.
+
+6. Read-only.
+   The `edit` and `write` tools are disabled in this mode. Do not attempt to
+   modify files. If the user asks for a change, tell them to run
+   `/grounded off` first.
+
+Answer in the user's language. Keep the two labels exactly as written above.
+```
+
+### 设计说明（为什么这样写）
+
+| 条目 | 意图 |
+|---|---|
+| 第 1 条末句 | 直接点名要拦截的失败模式（"同类框架一般怎么做"），比抽象要求更有效 |
+| 第 2 条"bare filename 不算" | 与 §5.4 正则的判定规则严格对齐，避免模型给了文件名却被判 `no-citation` |
+| **第 3 条末两句** | **针对头号风险 R6 的核心杠杆** —— 告知模型"你给的引用会被机器校验、错的会当众展示"，这比单纯要求引用更能改变行为 |
+| 第 4 条"直接支持的不加标签" | 遵循 **D6**，避免每句话都挂标签导致回答啰嗦 |
+| 第 6 条 | 与 **D1** 只读模式配套，让模型知道该怎么回应修改请求（对应 US4），而不是反复重试失败的工具 |
+| 末句 | 保证中文提问得到中文回答，同时锁定标记文案不被翻译 |
+
+### 迭代规则
+
+若 M2 实测 **T-3 不达标**（`no-citation` 轮次 ≥ 30%），按以下顺序迭代，**每轮只改一处并重测**，最多 3 轮（超出则触发 **K4**）：
+
+1. 强化第 3 条的校验告知（如加入"invalid citations are highlighted in red to the user"）
+2. 在第 2 条加入正例/反例示范
+3. 把整段从 system prompt 末尾改为独立的高优先级段落，或提高措辞强度（MUST / NEVER）
+
+每轮迭代的措辞与实测结果都记入 `NOTES.md`。
