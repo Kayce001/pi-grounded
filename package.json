@@ -1,0 +1,32 @@
+{
+  "name": "pi-grounded",
+  "version": "0.1.0",
+  "description": "Ground Pi's answers in the codebase, not assumptions. Read-only research mode with automatic file:line citation verification.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "grounded",
+    "citations"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.85.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "typescript": "5.7.2",
+    "vitest": "2.1.8",
+    "@earendil-works/pi-tui": "0.85.1"
+  }
+}
