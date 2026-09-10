@@ -321,7 +321,9 @@ Pi 内置工具全集：`read` `bash` `powershell` `edit` `write` `grep` `find` 
 - [ ] 开启后 `/tools` 里 `edit`、`write` 消失；关闭后回来
 - [ ] **中途 `/tools` 关掉 `find`，再 `/grounded off`，`find` 保持关闭**（不被覆盖）
 - [ ] 让 agent 改文件 → 明确回复处于只读模式，不崩溃
-- [ ] 软链到 `~/.pi/agent/extensions/` 后 `/reload` 正常，无残留状态
+- [ ] 通过用户 `settings.json` 的 `"extensions": ["<repo>/src/index.ts"]` 加载后 `/reload` 正常，无残留状态
+
+> 开发期**不用软链** —— Windows 上建符号链接需管理员权限或开发者模式。改走 `settings.json` 的 `extensions` 数组，任意目录启动 `pi` 都能加载，可直接去 Pi 源码目录测试。详见 `VERIFY.md` §0.2。
 
 ### M1 · 引用校验（1 天）· **V1 核心**
 
