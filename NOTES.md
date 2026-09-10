@@ -12,20 +12,83 @@
 
 > `message_end` 返回替换 message 是否会破坏会话功能。决定 PLAN §5.5 走首选还是降级方案。
 
-**测试方法**：临时扩展，在 `message_end` 给 assistant message 末尾追加一行，再依次测试四项功能。
+**完成时间**：2026-09-10 · **成本**：约 $0.033（7 次真实模型调用）
 
-| 功能 | 结果 | 说明 |
+**测试方法**：`pi` 的非交互模式（`-p` + `--mode json` + `--session-dir` 隔离），三个临时扩展做对照。
+临时文件位于 scratchpad `spike/`，不入库。
+
+### 1.1 三个对照组
+
+| Spike | 做法 | 结果 |
 |---|---|---|
-| `/export` | ⬜ 待测 | |
-| `/tree` | ⬜ 待测 | |
-| `/resume` | ⬜ 待测 | |
-| `/share` | ⬜ 待测 | |
+| **A** `spike-append.ts` | `message_end` 返回替换后的 message，content 数组追加一个 text 块 | 功能正常，**但注释进了 LLM 上下文** |
+| **B** `spike-entry.ts` | `message_end` 里调 `appendEntry` | 不进上下文，**但 entry 落在 assistant 消息之前** |
+| **C** `spike-settled.ts` | `message_end` 只扫描，`agent_settled` 里 `appendEntry` | ✅ **全部正确** |
 
-**结论**：⬜ 待填
+### 1.2 四项功能验证
 
-**采用方案**：⬜ `message_end` 替换 / ⬜ `appendEntry` + `registerEntryRenderer` 降级
+| 功能 | 方案 A | 方案 C | 说明 |
+|---|:---:|:---:|---|
+| 会话文件完整性 | ✅ | ✅ | JSONL 结构正常，内容持久化 |
+| `--session` 恢复 | ✅ | ✅ | provider 接受修改后的历史；A 中原文本块 `textSignature` 未被破坏（因为是追加新块而非改写） |
+| `--export` HTML | ✅ | ✅ | 内容以 base64 嵌在 `__DATA__`，解码后确认保留 |
+| `/tree` | ⚠️ | ⚠️ | **纯 TUI，未自动验证**。会话文件的 parent 链正常，推断渲染无问题，但这是**推断不是事实** |
+| `/share` | ⏭️ | ⏭️ | **未测** —— 会往用户 GitHub 发 gist，属外部发布行为，不为验收去做 |
 
-> 结论确定后必须同步写回 `PLAN.md` §5.5 并 commit。
+### 1.3 决定性发现
+
+**① `message_end` 替换消息 → 注释会进入 LLM 上下文**
+
+对照实验：同样的提问格式
+
+```
+"Does any earlier assistant message contain the literal string X? Answer only YES or NO."
+```
+
+- 方案 A（替换 message）→ 模型答 **YES**
+- 方案 C（appendEntry）→ 模型答 **NO**
+
+这意味着方案 A 下，每轮警告块都会被送回模型。三重坏处：浪费 token、模型可能模仿格式或对警告作出反应、污染对话。**而注释本来就是给用户看的，不该进模型上下文。**
+
+pi 文档对此有明确说法：
+> *"Custom entries do NOT participate in LLM context."*
+> *"For durable TUI-only content that should not be sent to the LLM, use `pi.appendEntry()` with `pi.registerEntryRenderer()`."*
+
+**所以 PLAN 里所谓的"降级方案"其实才是正确方案** —— 文档字面描述的就是这个用例。不是 `message_end` 坏了，是它语义上不适合放注释。
+
+**② `appendEntry` 不能在 `message_end` 里调用**
+
+`message_end` 处理器在消息入库前执行，此时 append 的 entry 会挂到**用户消息**下面：
+
+```
+message  role=user   text='Reply with exactly: WORLD'
+custom   >>> spike-note              ← 错误：落在回答之前
+message  role=assistant text='WORLD'
+```
+
+改到 `agent_settled` 后正确：
+
+```
+message  role=user      text='Reply with exactly: ORDER'
+message  role=assistant text='ORDER'
+custom   >>> spike-note              ← 正确
+```
+
+**结论**：`message_end` 只做扫描（无副作用），`agent_settled` 做提交。这个拆分顺带带来一个好处：多轮工具调用的 run 只在最后标注一次，而不是每个中间轮次都标。
+
+### 1.4 采用方案
+
+- [x] **`appendEntry` + `registerEntryRenderer`，在 `agent_settled` 提交**
+- [ ] ~~`message_end` 替换 message~~ —— 因污染 LLM 上下文而否决
+
+> 已同步写回 `PLAN.md` §5.5 / §6.1。
+
+### 1.5 附带发现
+
+- `@earendil-works/pi-tui` 对独立 `-e` 加载的扩展可正常解析，不需要 `node_modules`
+- `pi --export <file>` 的参数是**输入的会话文件**，不是输出路径；产物落在 cwd，命名 `pi-session-<原名>.html`
+- 导出 HTML 把会话数据 base64 编码进 `__DATA__`，用 `atob` 解 —— 直接 grep 原文搜不到，验证时必须先解码
+- `--session-dir` 可以完全隔离测试会话，不污染用户真实历史
 
 ---
 

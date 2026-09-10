@@ -254,8 +254,11 @@ Pi 内置工具全集：`read` `bash` `powershell` `edit` `write` `grep` `find` 
 
 - **footer**：开启时常驻 `🔍 grounded`；判定后追加 `· ✓3` 或 `· ⚠️1`
 - **回答后提示块**：仅 `no-citation` 和 `invalid` 时出现
-  - 首选：`message_end` 返回替换后的 message（**取决于 Spike 结果，见 §6 S0**）
-  - 降级：`appendEntry` + `registerEntryRenderer` 做 TUI-only 块
+  - ✅ **已由 S0 定案**：`pi.appendEntry("grounded-note", ...)` + `pi.registerEntryRenderer()`，**在 `agent_settled` 中提交**
+  - ❌ 否决 `message_end` 替换 message：实测确认追加内容会**进入 LLM 上下文**，每轮警告都被送回模型 —— 浪费 token、可能被模仿、污染对话。而注释是给用户看的，本就不该进上下文
+  - ⚠️ **`appendEntry` 必须在 `agent_settled` 调用，不能在 `message_end` 里** —— 后者会让 entry 落在 assistant 消息**之前**（`message_end` 处理器在消息入库前执行）
+
+> 实测数据见 `NOTES.md` §1。这个拆分（`message_end` 只扫描 / `agent_settled` 提交）顺带带来一个好处：多轮工具调用的 run 只在最后标注一次，而不是每个中间轮次都标。
 
 ---
 
@@ -269,7 +272,9 @@ Pi 内置工具全集：`read` `bash` `powershell` `edit` `write` `grep` `find` 
 | `pi.registerFlag` | `--grounded` |
 | `pi.on("before_agent_start")` | 注入 system prompt |
 | `pi.on("turn_start")` | 清空行数缓存 |
-| `pi.on("message_end")` | 提取引用 → 校验 → 附提示块 |
+| `pi.on("message_end")` | 提取引用 → 校验 → **只记录，不产生副作用**（S0 定案） |
+| `pi.on("agent_settled")` | 提交判定结果：`appendEntry` + footer 状态（S0 定案） |
+| `pi.registerEntryRenderer()` | 渲染提示块（TUI-only，不进 LLM 上下文） |
 | `pi.getActiveTools` / `setActiveTools` | 只读模式 |
 | `pi.exec` | 取 git 仓库根 |
 | `ctx.ui.setStatus` / `notify` | footer 与通知 |
