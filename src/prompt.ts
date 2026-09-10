@@ -19,7 +19,8 @@ not changing it.
 
 1. Evidence before claims.
    Before stating any fact about how THIS codebase works, read the relevant
-   source with \`read\`, \`grep\`, or \`find\`. Do not answer from general
+   source first — with \`read\`, with \`grep\` or \`find\` if they are enabled,
+   otherwise with \`grep\`/\`rg\` through \`bash\`. Do not answer from general
    knowledge of how similar projects are usually built. "Most agent frameworks
    do X" is not an answer to "what does this code do".
 
