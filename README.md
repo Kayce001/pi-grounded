@@ -107,6 +107,36 @@ The note is a **custom entry**, not part of the assistant message. That matters:
 
 Paths are resolved against the working directory first, then the git repository root, so repo-relative references work from a subdirectory. A file that cannot be measured (too large, unreadable) is **accepted**, never reported as invalid — a false alarm is worse than a missed one.
 
+## Status and limitations
+
+Read this before relying on it.
+
+### What has been verified
+
+| | |
+|---|---|
+| Unit tests | 74, all passing. Confirmed non-decorative by mutation testing — breaking the line-range check turns 6 of them red |
+| Citation verification | All four verdict paths exercised end to end against a real repository |
+| False positives | Zero observed. 117 citations across 7 real answers, plus an independent spot check of 10 using `test -f` and `wc -l` rather than this project's own code |
+| Read-only mode | Confirmed with a control run: without the mode the model calls `write` and modifies the file; with it there are no tool calls at all |
+
+### What has not
+
+`/reload` hot-reloading, how the note looks in `/tree`, and `/share`. All three need a TUI session that has not happened yet.
+
+### Measurement is incomplete
+
+The A/B baseline was cut short when the provider quota ran out: **2 of 12** answers without the mode, **7 of 12** with it. The difference is stark — 0% of baseline answers carried a `file:line`, against 100% with the mode on, and tool calls per answer roughly doubled — but **n=2 and n=7 cannot support anything finer than that**.
+
+More importantly: across those 117 citations the model did not fabricate a single line number, so **the verification layer has yet to catch anything**. It may be that being told its references are checked is what keeps them honest, in which case the layer earns its place by deterrence rather than by detection. That is not falsifiable from here, and it is an open question about this project rather than a settled result.
+
+### Known issues
+
+1. **A general-knowledge question still collects a `no-citation` warning** while the mode is on, if the answer is long enough. Deliberate: any attempt to auto-detect "is this a question about the codebase" would introduce a second unreliable judgement. Turn the mode off for those.
+2. **References outside the working directory and the git root** are reported as not found.
+3. **Verification checks that a reference exists, not that it supports the claim** attached to it. A real line cited for the wrong reason still passes.
+4. **When the extension is not loaded, the model can impersonate it.** Running `pi` bare in a directory containing this repository and typing `/grounded` is not a registered command, so pi passes it to the model — which, having read the source, will happily perform the plugin's output, complete with a plausible session tally. This is not fixable from inside the extension. The reliable tells are the `🔍 grounded` footer badge, the startup extensions list, and the rendered block; plain text output can be faked.
+
 ## Compared to `pi-behavior-control`
 
 [`wbelk/pi-behavior-control`](https://github.com/wbelk/pi-behavior-control) covers a broader set of agent behaviors — read-before-edit, post-edit review, speculation verification — and uses a separate verifier model to scan responses.

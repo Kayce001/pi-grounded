@@ -22,12 +22,12 @@ node --version  # 应为 v20 以上（当前 v24.19.0）
 
 **不要用软链** —— Windows 上建符号链接需要管理员权限或开发者模式，麻烦。直接改 Pi 的用户设置：
 
-编辑 `C:/Users/<user>\.pi\agent\settings.json`，加入 `extensions` 字段：
+编辑 `~/.pi/agent/settings.json`（Windows 上是 `C:\Users\<你>\.pi\agent\settings.json`），加入 `extensions` 字段：
 
 ```jsonc
 {
   // ... 你原有的配置保持不动 ...
-  "extensions": ["<repo>/src/index.ts"]
+  "extensions": ["/绝对路径/pi-grounded/src/index.ts"]
 }
 ```
 
@@ -35,7 +35,7 @@ node --version  # 应为 v20 以上（当前 v24.19.0）
 
 **临时试用**（不改设置）：
 ```bash
-pi -e <repo>/src/index.ts
+pi -e /绝对路径/pi-grounded/src/index.ts
 ```
 
 ### 0.3 卸载
@@ -65,7 +65,7 @@ pi -e <repo>/src/index.ts
 ### 检查 1 · 单元测试
 
 ```bash
-cd <repo>
+cd /绝对路径/pi-grounded
 npm install
 npm test
 ```
@@ -243,7 +243,7 @@ Pi 的 compaction 是怎么触发的？简要说明即可。
 
 | 敲什么 | 应该看到 | 看不到说明 |
 |---|---|---|
-| `pi install <repo>` | 安装成功 | 包结构有问题 |
+| `pi install /绝对路径/pi-grounded` | 安装成功 | 包结构有问题 |
 | `pi list` | 列表里有 `pi-grounded` | 同上 |
 | 装完后在任意目录 `pi` → `/grounded` | 正常工作 | 打包后的入口路径不对 |
 | `pi remove pi-grounded` | 干净卸载，`pi` 启动后 `/grounded` 不再存在 | 卸载残留 |
@@ -279,7 +279,7 @@ Pi 的 compaction 是怎么触发的？简要说明即可。
 ### 3.2 逐 commit 看 diff
 
 ```bash
-cd <repo>
+cd /绝对路径/pi-grounded
 git log --oneline
 git show <commit>
 ```
