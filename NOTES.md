@@ -112,6 +112,8 @@ Codex error: The usage limit has been reached
 
 全部关于 Pi 自身源码（`earendil-works/pi` @ 0.85.1），覆盖三类。提问时工作目录为 pi 仓库根。
 
+> **模型**：`gpt-5.6-sol`（openai-codex），thinking level `medium`。**换模型后本节所有数字都不再适用** —— 引用行为在不同模型间差异很大，这是解读时最需要注意的一条。
+
 | # | 类别 | 题目 | A | B |
 |---|---|---|:---:|:---:|
 | Q1 | 架构 | Harness、Lane、Session、Branch 之间是什么关系？ | ✅ | ✅ |

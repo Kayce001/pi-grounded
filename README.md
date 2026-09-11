@@ -37,7 +37,7 @@ And when it invents one:
 ## Install
 
 ```bash
-pi install git:github.com/<you>/pi-grounded
+pi install git:github.com/Kayce001/pi-grounded
 ```
 
 Or point at a local clone:

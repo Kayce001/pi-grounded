@@ -39,7 +39,7 @@
 ## 安装
 
 ```bash
-pi install git:github.com/<你>/pi-grounded
+pi install git:github.com/Kayce001/pi-grounded
 ```
 
 或者指向本地目录：

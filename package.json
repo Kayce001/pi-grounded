@@ -4,17 +4,32 @@
   "description": "Ground Pi's answers in the codebase, not assumptions. Read-only research mode with automatic file:line citation verification.",
   "type": "module",
   "license": "MIT",
+  "author": "Kayce001",
   "keywords": [
     "pi-package",
     "pi-extension",
     "grounded",
     "citations"
   ],
+  "homepage": "https://github.com/Kayce001/pi-grounded#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kayce001/pi-grounded.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Kayce001/pi-grounded/issues"
+  },
   "pi": {
     "extensions": [
       "./src/index.ts"
     ]
   },
+  "files": [
+    "src",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
