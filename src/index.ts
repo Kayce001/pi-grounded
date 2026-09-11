@@ -128,6 +128,19 @@ export default function grounded(pi: ExtensionAPI) {
 			return;
 		}
 
+		// Diagnostic: append a note straight from the command handler. If this
+		// renders but the one from agent_settled does not, the problem is timing,
+		// not the renderer.
+		if (arg === "demo") {
+			pi.appendEntry<NoteData>(UI.entryType, {
+				verdict: "invalid",
+				summary: "⚠️ 这是 /grounded demo 生成的测试块",
+				details: ["demo/fake.ts:9999 → 文件不存在", "第二行明细"],
+			});
+			ctx.ui.notify("已 appendEntry。上方应出现一个提示块。", "info");
+			return;
+		}
+
 		if (arg === "status") {
 			const lines = [
 				`grounded: ${enabled ? "on" : "off"}`,
