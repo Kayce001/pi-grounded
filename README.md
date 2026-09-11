@@ -2,6 +2,13 @@
 
 **Ground Pi's answers in the codebase, not assumptions.**
 
+> [!WARNING]
+> **Experimental.** This is my first Pi extension, written while learning how Pi's
+> extension API works. It does what the README says and the tests back that up, but
+> it has been used by one person on one machine for a matter of days. Expect rough
+> edges, and read [Status and limitations](#status-and-limitations) before relying
+> on it for anything that matters.
+
 A [Pi](https://github.com/earendil-works/pi) extension for *reading* unfamiliar code. It does two things:
 
 1. **Read-only research mode** — `edit` and `write` are removed from the tool set, so the agent can look but not touch.
